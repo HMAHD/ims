@@ -220,7 +220,7 @@
         let productArray = [];
 
         @if(@$adjustment)
-        productArray = @json($adjustment - > adjustmentDetails - > pluck('product_id') - > toArray());
+        productArray = @json($adjustment->adjustmentDetails->pluck('product_id')->toArray());
         @endif
 
         $("[name='search']").on('input', function() {
