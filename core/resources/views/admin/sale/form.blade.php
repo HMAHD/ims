@@ -367,12 +367,17 @@
         productArray = @json($sale->saleDetails->pluck('product_id')->toArray());
         @endif
 
-        calculateGrandTotal();
-
-        // Cross-sale functionality
+        // Cross-sale functionality - declare variables first
         let customerCrossSaleData = {};
         let appliedReturnAmount = 0;
         let appliedDueAmount = 0;
+
+        calculateGrandTotal();
+
+        // Debug: Test if jQuery and selectors are working
+        console.log('jQuery loaded:', typeof $ !== 'undefined');
+        console.log('Search input found:', $("[name='search']").length);
+        console.log('Warehouse select found:', $("[name=warehouse_id]").length);
 
         // Load customer cross-sale data when customer is selected
         $('#customer').on('change', function() {
@@ -480,22 +485,28 @@
         });
 
         $("[name='search']").on('input', function() {
+            console.log('Search input event fired!', $(this).val());
             $('.products-container .error-message').empty();
             let data = {};
             data.search = $(this).val();
             data.warehouse = $("[name=warehouse_id]").find(':selected').val();
             var warehouseId = data.warehouse;
 
+            console.log('Search data:', data);
+
             if (data.warehouse && data.search) {
+                console.log('Making AJAX request...');
                 $.ajax({
                     url: "{{ route('admin.sale.search.product') }}",
                     method: 'GET',
                     data: data,
                     success: function(response) {
+                        console.log('Product search response:', response);
+
                         var products = '';
                         $(".products").html('');
 
-                        if (response.data.length) {
+                        if (response.data && response.data.length) {
                             $.each(response.data, function(key, product) {
                                 // Find stock for the selected warehouse
                                 var stock = product.product_stock ? product.product_stock.find((e) => e.warehouse_id == warehouseId) : null;
@@ -509,10 +520,15 @@
                                         </li>`;
                             });
                         } else {
+                            let debugInfo = response.debug ? JSON.stringify(response.debug, null, 2) : 'No debug info';
                             $('.products-container .error-message').html(`
                                 <div class="empty-notification text-center">
                                     <img src="{{ getImage('assets/images/empty_list.png') }}" alt="empty">
                                     <p class="mt-3">@lang('No product found')</p>
+                                    <details class="mt-2">
+                                        <summary>Debug Info</summary>
+                                        <pre style="text-align: left; font-size: 12px;">${debugInfo}</pre>
+                                    </details>
                                 </div>
                             `);
                         }
@@ -530,9 +546,11 @@
                     }
                 });
             } else if (!data.warehouse) {
+                console.log('No warehouse selected');
                 $('#warningModal').modal('show');
                 $(this).val('');
             } else {
+                console.log('No search term or other condition');
                 $(".products").empty();
                 $('.products-container .error-message').empty();
             }

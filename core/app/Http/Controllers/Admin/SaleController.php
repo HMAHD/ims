@@ -14,6 +14,7 @@ use App\Services\CrossSaleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
+
 class SaleController extends Controller
 {
 
@@ -410,24 +411,70 @@ class SaleController extends Controller
 
     public function searchProduct(Request $request)
     {
-        $warehouse = $request->warehouse;
-        $search = $request->search;
+        try {
+            $warehouse = $request->warehouse;
+            $search = $request->search;
 
-        $products = Product::query()
-            ->whereHas('productStock', function ($q) use ($warehouse) {
-                $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
-            })
-            ->where(function ($query) use ($search) {
+            // Debug: Check if we have any products at all
+            $totalProducts = Product::count();
+            $totalWarehouses = Warehouse::count();
+            $totalStocks = ProductStock::count();
+
+            if (!$warehouse || !$search) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Warehouse and search term are required',
+                    'debug' => [
+                        'total_products' => $totalProducts,
+                        'total_warehouses' => $totalWarehouses,
+                        'total_stocks' => $totalStocks,
+                        'warehouse_received' => $warehouse,
+                        'search_received' => $search
+                    ],
+                    'data' => []
+                ]);
+            }
+
+            // First, let's try without stock filter to see if products exist
+            $allProducts = Product::where(function ($query) use ($search) {
                 $query->where('name', 'like', '%' . $search . '%')
                     ->orWhere('sku', 'like', '%' . $search . '%');
-            })
-            ->with(['productStock', 'unit'])
-            ->get();
+            })->with(['productStock', 'unit'])->get();
 
-        return response()->json([
-            'success' => true,
-            'data'    => $products,
-        ]);
+            // Now with stock filter
+            $products = Product::query()
+                ->whereHas('productStock', function ($q) use ($warehouse) {
+                    $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
+                })
+                ->where(function ($query) use ($search) {
+                    $query->where('name', 'like', '%' . $search . '%')
+                        ->orWhere('sku', 'like', '%' . $search . '%');
+                })
+                ->with(['productStock', 'unit'])
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'debug' => [
+                    'total_products' => $totalProducts,
+                    'total_warehouses' => $totalWarehouses,
+                    'total_stocks' => $totalStocks,
+                    'warehouse_id' => $warehouse,
+                    'search_term' => $search,
+                    'all_matching_products' => $allProducts->count(),
+                    'products_with_stock' => $products->count(),
+                    'warehouse_stocks' => ProductStock::where('warehouse_id', $warehouse)->count()
+                ],
+                'data' => $products,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error searching products: ' . $e->getMessage(),
+                'error_details' => $e->getTraceAsString(),
+                'data' => []
+            ], 500);
+        }
     }
 
     public function lastInvoice()
