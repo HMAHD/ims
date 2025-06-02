@@ -28,4 +28,18 @@ class SaleReturn extends Model
     {
         return $this->hasMany(SaleReturnDetails::class);
     }
+
+    public function appliedToSales()
+    {
+        return $this->hasMany(SaleReturnApplication::class, 'original_sale_return_id');
+    }
+
+    /**
+     * Get remaining amount that can be applied to new sales
+     */
+    public function getRemainingApplicableAmount()
+    {
+        $appliedAmount = $this->appliedToSales()->sum('applied_amount');
+        return max(0, $this->due_amount - $appliedAmount);
+    }
 }

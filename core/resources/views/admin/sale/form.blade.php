@@ -69,6 +69,52 @@
 
                             </div>
                         </div>
+
+                        <!-- Customer Cross-Sale Information -->
+                        <div class="col-sm-12" id="customer-cross-sale-section" style="display: none;">
+                            <div class="card border-primary mb-3">
+                                <div class="card-header bg-primary text-white">
+                                    <h6 class="mb-0">@lang('Customer Previous Returns & Due Amounts')</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="text-success">@lang('Available Returns')</h6>
+                                            <div id="available-returns-list">
+                                                <!-- Returns will be loaded here -->
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6 class="text-warning">@lang('Outstanding Dues')</h6>
+                                            <div id="available-dues-list">
+                                                <!-- Dues will be loaded here -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label>@lang('Apply Return Amount')</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                                                    <input type="number" class="form-control" id="apply-return-amount" step="0.01" min="0" value="0">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label>@lang('Apply Due Amount')</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                                                    <input type="number" class="form-control" id="apply-due-amount" step="0.01" min="0" value="0">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="col-sm-12">
                             <div class="form-group products-container position-relative">
                                 <label> @lang('Product')<span class="text--danger">*</span></label>
@@ -318,10 +364,120 @@
         let productArray = [];
 
         @if(@$sale)
-        productArray = @json($sale - > saleDetails - > pluck('product_id') - > toArray());
+        productArray = @json($sale->saleDetails->pluck('product_id')->toArray());
         @endif
 
         calculateGrandTotal();
+
+        // Cross-sale functionality
+        let customerCrossSaleData = {};
+        let appliedReturnAmount = 0;
+        let appliedDueAmount = 0;
+
+        // Load customer cross-sale data when customer is selected
+        $('#customer').on('change', function() {
+            const customerId = $(this).val();
+            if (customerId) {
+                loadCustomerCrossSaleData(customerId);
+            } else {
+                $('#customer-cross-sale-section').hide();
+            }
+        });
+
+        function loadCustomerCrossSaleData(customerId) {
+            $.ajax({
+                url: "{{ route('admin.sale.customer.cross.sale.data') }}",
+                method: 'GET',
+                data: {
+                    customer_id: customerId
+                },
+                success: function(response) {
+                    if (response.success) {
+                        customerCrossSaleData = response.data;
+                        displayCrossSaleData(response.data);
+                        if (response.data.returns.length > 0 || response.data.dues.length > 0) {
+                            $('#customer-cross-sale-section').show();
+                        } else {
+                            $('#customer-cross-sale-section').hide();
+                        }
+                    }
+                },
+                error: function() {
+                    $('#customer-cross-sale-section').hide();
+                }
+            });
+        }
+
+        function displayCrossSaleData(data) {
+            // Display available returns
+            let returnsHtml = '';
+            if (data.returns.length > 0) {
+                returnsHtml += '<div class="table-responsive"><table class="table table-sm">';
+                returnsHtml += '<thead><tr><th>Invoice</th><th>Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>';
+                data.returns.forEach(function(returnItem) {
+                    returnsHtml += `<tr>
+                        <td>${returnItem.sale_invoice}</td>
+                        <td>${returnItem.return_date}</td>
+                        <td>{{ gs('cur_sym') }}${returnItem.remaining_amount}</td>
+                        <td><button type="button" class="btn btn-sm btn-success apply-return-btn" data-return-id="${returnItem.id}" data-amount="${returnItem.remaining_amount}">Apply</button></td>
+                    </tr>`;
+                });
+                returnsHtml += '</tbody></table></div>';
+                returnsHtml += `<p class="text-success"><strong>Total Available: {{ gs('cur_sym') }}${data.total_return_amount}</strong></p>`;
+            } else {
+                returnsHtml = '<p class="text-muted">No available returns</p>';
+            }
+            $('#available-returns-list').html(returnsHtml);
+
+            // Display available dues
+            let duesHtml = '';
+            if (data.dues.length > 0) {
+                duesHtml += '<div class="table-responsive"><table class="table table-sm">';
+                duesHtml += '<thead><tr><th>Invoice</th><th>Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>';
+                data.dues.forEach(function(due) {
+                    duesHtml += `<tr>
+                        <td>${due.invoice_no}</td>
+                        <td>${due.sale_date}</td>
+                        <td>{{ gs('cur_sym') }}${due.remaining_amount}</td>
+                        <td><button type="button" class="btn btn-sm btn-warning apply-due-btn" data-sale-id="${due.id}" data-amount="${due.remaining_amount}">Apply</button></td>
+                    </tr>`;
+                });
+                duesHtml += '</tbody></table></div>';
+                duesHtml += `<p class="text-warning"><strong>Total Outstanding: {{ gs('cur_sym') }}${data.total_due_amount}</strong></p>`;
+            } else {
+                duesHtml = '<p class="text-muted">No outstanding dues</p>';
+            }
+            $('#available-dues-list').html(duesHtml);
+        }
+
+        // Handle apply return button clicks
+        $(document).on('click', '.apply-return-btn', function() {
+            const amount = parseFloat($(this).data('amount'));
+            const currentAmount = parseFloat($('#apply-return-amount').val()) || 0;
+            $('#apply-return-amount').val((currentAmount + amount).toFixed(2));
+            appliedReturnAmount = currentAmount + amount;
+            calculateGrandTotal();
+        });
+
+        // Handle apply due button clicks
+        $(document).on('click', '.apply-due-btn', function() {
+            const amount = parseFloat($(this).data('amount'));
+            const currentAmount = parseFloat($('#apply-due-amount').val()) || 0;
+            $('#apply-due-amount').val((currentAmount + amount).toFixed(2));
+            appliedDueAmount = currentAmount + amount;
+            calculateGrandTotal();
+        });
+
+        // Handle manual input changes
+        $('#apply-return-amount').on('input', function() {
+            appliedReturnAmount = parseFloat($(this).val()) || 0;
+            calculateGrandTotal();
+        });
+
+        $('#apply-due-amount').on('input', function() {
+            appliedDueAmount = parseFloat($(this).val()) || 0;
+            calculateGrandTotal();
+        });
 
         $("[name='search']").on('input', function() {
             $('.products-container .error-message').empty();
@@ -535,11 +691,47 @@
 
             var discount = parseFloat($("[name=discount]").val() * 1);
             $(".total_price").val(total.toFixed(2));
-            var payableAmount = total - discount;
+
+            // Calculate with cross-sale adjustments
+            var payableAmount = total - discount + appliedDueAmount - appliedReturnAmount;
 
             $(".receivable_amount").val(payableAmount.toFixed(2));
             let payingAmount = $('[name=received_amountreceived_amount]').val();
-            $(".due_amount").val(payableAmount - payingAmount);
+            $(".due_amount").val((payableAmount - payingAmount).toFixed(2));
+
+            // Update display for cross-sale amounts
+            updateCrossSaleDisplay();
+        }
+
+        function updateCrossSaleDisplay() {
+            // Add visual indicators for applied amounts
+            if (appliedReturnAmount > 0 || appliedDueAmount > 0) {
+                let crossSaleInfo = '';
+                if (appliedReturnAmount > 0) {
+                    crossSaleInfo += `<div class="text-success">Applied Return: -{{ gs('cur_sym') }}${appliedReturnAmount.toFixed(2)}</div>`;
+                }
+                if (appliedDueAmount > 0) {
+                    crossSaleInfo += `<div class="text-warning">Applied Due: +{{ gs('cur_sym') }}${appliedDueAmount.toFixed(2)}</div>`;
+                }
+
+                // Add or update cross-sale display in the summary section
+                if ($('#cross-sale-summary').length === 0) {
+                    $('.receivable_amount').parent().parent().after(`
+                        <div class="col-sm-12" id="cross-sale-summary">
+                            <div class="card border-info">
+                                <div class="card-body p-2">
+                                    <h6 class="text-info mb-1">Cross-Sale Adjustments:</h6>
+                                    <div id="cross-sale-details">${crossSaleInfo}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `);
+                } else {
+                    $('#cross-sale-details').html(crossSaleInfo);
+                }
+            } else {
+                $('#cross-sale-summary').remove();
+            }
         }
 
 

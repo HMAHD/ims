@@ -10,6 +10,7 @@ use App\Models\SaleDetails;
 use App\Models\Customer;
 use App\Models\ProductStock;
 use App\Models\Warehouse;
+use App\Services\CrossSaleService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -17,6 +18,13 @@ class SaleController extends Controller
 {
 
     protected $pageTitle;
+    protected $products;
+    protected $productIds;
+    protected $totalPrice;
+    protected $productStocks;
+    protected $oldStocks;
+    protected $saleDetails;
+    protected $oldWarehouseId;
 
     public function __construct()
     {
@@ -122,7 +130,12 @@ class SaleController extends Controller
                 'saleReturn',
                 'saleReturn.details',
                 'saleReturn.details.product',
-                'saleReturn.details.product.unit'
+                'saleReturn.details.product.unit',
+                'returnApplications',
+                'returnApplications.originalSaleReturn',
+                'returnApplications.originalSaleReturn.sale',
+                'dueApplications',
+                'dueApplications.originalSale'
             ])
             ->whereHas('saleDetails')
             ->firstOrFail();
@@ -424,5 +437,58 @@ class SaleController extends Controller
             'data'   => $lastInvoiceNo,
 
         ]);
+    }
+
+    /**
+     * Get customer's available returns and dues for cross-sale application
+     */
+    public function getCustomerCrossSaleData(Request $request)
+    {
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id'
+        ]);
+
+        $crossSaleService = new CrossSaleService();
+        $data = $crossSaleService->getCustomerAvailableAmounts($request->customer_id);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    /**
+     * Apply cross-sale amounts to a sale
+     */
+    public function applyCrossSaleAmounts(Request $request, $saleId)
+    {
+        $request->validate([
+            'applied_returns' => 'nullable|array',
+            'applied_returns.*.return_id' => 'required|exists:sale_returns,id',
+            'applied_returns.*.amount' => 'required|numeric|min:0',
+            'applied_dues' => 'nullable|array',
+            'applied_dues.*.sale_id' => 'required|exists:sales,id',
+            'applied_dues.*.amount' => 'required|numeric|min:0',
+        ]);
+
+        try {
+            $crossSaleService = new CrossSaleService();
+            $sale = $crossSaleService->applyCrossSaleAmounts(
+                $saleId,
+                $request->applied_returns ?? [],
+                $request->applied_dues ?? []
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cross-sale amounts applied successfully',
+                'sale' => $sale
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error applying cross-sale amounts: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }

@@ -163,6 +163,10 @@ Route::middleware(['admin', 'admin.permission'])->group(function () {
         Route::get('search-customer', 'searchCustomer')->name('search.customer');
 
         Route::get('last-invoice', 'lastInvoice')->name('last.invoice');
+
+        // Cross-sale functionality
+        Route::get('customer-cross-sale-data', 'getCustomerCrossSaleData')->name('customer.cross.sale.data');
+        Route::post('apply-cross-sale/{id}', 'applyCrossSaleAmounts')->name('apply.cross.sale');
     });
 
     //Manage Sale Return

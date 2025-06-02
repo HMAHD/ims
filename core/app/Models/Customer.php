@@ -56,17 +56,56 @@ class Customer extends Model
         return abs($saleAmount) + $returnAmount;
     }
 
+    /**
+     * Get available returns that can be applied to new sales
+     */
+    public function getAvailableReturns()
+    {
+        return $this->saleReturns()
+            ->where('due_amount', '>', 0)
+            ->whereDoesntHave('appliedToSales')
+            ->with(['sale', 'details.product'])
+            ->get();
+    }
+
+    /**
+     * Get available due amounts that can be applied to new sales
+     */
+    public function getAvailableDues()
+    {
+        return $this->sale()
+            ->where('due_amount', '>', 0)
+            ->whereDoesntHave('appliedToDues')
+            ->get();
+    }
+
+    /**
+     * Get total available return amount
+     */
+    public function getTotalAvailableReturnAmount()
+    {
+        return $this->getAvailableReturns()->sum('due_amount');
+    }
+
+    /**
+     * Get total available due amount
+     */
+    public function getTotalAvailableDueAmount()
+    {
+        return $this->getAvailableDues()->sum('due_amount');
+    }
+
     public function fullname(): Attribute
     {
         return new Attribute(
-            get: fn () => $this->name,
+            get: fn() => $this->name,
         );
     }
 
     public function mobileNumber(): Attribute
     {
         return new Attribute(
-            get: fn () =>  $this->mobile,
+            get: fn() =>  $this->mobile,
         );
     }
 }

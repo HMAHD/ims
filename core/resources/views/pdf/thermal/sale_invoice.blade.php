@@ -71,9 +71,23 @@
     </div>
     @endif
 
+    @if($sale->applied_due_amount > 0)
+    <div class="summary-row">
+        <span>@lang('Previous Due Applied'):</span>
+        <span>+{{ showAmount($sale->applied_due_amount) }}</span>
+    </div>
+    @endif
+
+    @if($sale->applied_return_amount > 0)
+    <div class="summary-row">
+        <span>@lang('Previous Return Applied'):</span>
+        <span>-{{ showAmount($sale->applied_return_amount) }}</span>
+    </div>
+    @endif
+
     <div class="summary-row total">
         <span>@lang('Grand Total'):</span>
-        <span>{{ showAmount($sale->receivable_amount) }}</span>
+        <span>{{ showAmount($sale->getFinalReceivableAmount()) }}</span>
     </div>
 
     <div class="summary-row">
@@ -176,6 +190,37 @@
                 @endforeach
             </tbody>
         </table>
+    </div>
+    @endif
+</div>
+@endif
+
+<!-- Cross-Sale Applications -->
+@if($sale->applied_return_amount > 0 || $sale->applied_due_amount > 0)
+<div class="cross-sale-info">
+    <div class="section-title">@lang('APPLIED ADJUSTMENTS')</div>
+
+    @if($sale->returnApplications && $sale->returnApplications->count() > 0)
+    <div class="applied-returns">
+        <div class="section-subtitle">@lang('Applied Returns'):</div>
+        @foreach($sale->returnApplications as $application)
+        <div class="summary-row">
+            <span>@lang('Return from') {{ $application->originalSaleReturn->sale->invoice_no }}:</span>
+            <span>-{{ showAmount($application->applied_amount) }}</span>
+        </div>
+        @endforeach
+    </div>
+    @endif
+
+    @if($sale->dueApplications && $sale->dueApplications->count() > 0)
+    <div class="applied-dues">
+        <div class="section-subtitle">@lang('Applied Previous Dues'):</div>
+        @foreach($sale->dueApplications as $application)
+        <div class="summary-row">
+            <span>@lang('Due from') {{ $application->originalSale->invoice_no }}:</span>
+            <span>+{{ showAmount($application->applied_amount) }}</span>
+        </div>
+        @endforeach
     </div>
     @endif
 </div>
