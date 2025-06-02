@@ -411,21 +411,23 @@ class SaleController extends Controller
     public function searchProduct(Request $request)
     {
         $warehouse = $request->warehouse;
-        $products  = Product::query()->whereHas('productStock', function ($q) use ($warehouse) {
-            $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
-        });
+        $search = $request->search;
 
-        $products = $products->with('productStock')->where(function ($query) use ($request) {
-            $query->searchable(['name', 'sku']);
-        });
+        $products = Product::query()
+            ->whereHas('productStock', function ($q) use ($warehouse) {
+                $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
+            })
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('sku', 'like', '%' . $search . '%');
+            })
+            ->with(['productStock', 'unit'])
+            ->get();
 
-        $products = $products->with('unit')->get();
-        if ($products) {
-            return response()->json([
-                'success' => true,
-                'data'    => $products,
-            ]);
-        }
+        return response()->json([
+            'success' => true,
+            'data'    => $products,
+        ]);
     }
 
     public function lastInvoice()

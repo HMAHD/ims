@@ -253,7 +253,7 @@
                                         <label>@lang('Received Amount')</label>
                                         <div class="input-group">
                                             <span class="input-group-text">{{ gs('cur_sym') }}</span>
-                                            <input class="form-control" name="received_amountreceived_amount" type="number"
+                                            <input class="form-control" name="received_amount" type="number"
                                                 value="{{ getAmount(@$sale->received_amount) }}" disabled>
                                         </div>
                                     </div>
@@ -497,12 +497,13 @@
 
                         if (response.data.length) {
                             $.each(response.data, function(key, product) {
-
-                                var stock = product.product_stock.find((e) => e
-                                    .warehouse_id == warehouseId);
+                                // Find stock for the selected warehouse
+                                var stock = product.product_stock ? product.product_stock.find((e) => e.warehouse_id == warehouseId) : null;
+                                var stockQuantity = stock ? stock.quantity : 0;
+                                var unitName = product.unit ? product.unit.name : '';
 
                                 products +=
-                                    `<li class="products__item productItem pt-2" data-stock="${stock.quantity}" data-id="${product.id}" data-name="${product.name}" data-unit="${product.unit.name}">
+                                    `<li class="products__item productItem pt-2" data-stock="${stockQuantity}" data-id="${product.id}" data-name="${product.name}" data-unit="${unitName}">
                                             <h6>${product.name}</h6>
                                             <small>SKU: ${product.sku}</small>
                                         </li>`;
@@ -518,6 +519,15 @@
 
                         $(".products").html(products);
                     },
+                    error: function(xhr, status, error) {
+                        console.error('Product search error:', error);
+                        console.error('Response:', xhr.responseText);
+                        $('.products-container .error-message').html(`
+                            <div class="alert alert-danger">
+                                <p>Error searching products. Please try again.</p>
+                            </div>
+                        `);
+                    }
                 });
             } else if (!data.warehouse) {
                 $('#warningModal').modal('show');
@@ -696,7 +706,7 @@
             var payableAmount = total - discount + appliedDueAmount - appliedReturnAmount;
 
             $(".receivable_amount").val(payableAmount.toFixed(2));
-            let payingAmount = $('[name=received_amountreceived_amount]').val();
+            let payingAmount = $('[name=received_amount]').val();
             $(".due_amount").val((payableAmount - payingAmount).toFixed(2));
 
             // Update display for cross-sale amounts

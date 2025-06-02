@@ -10,6 +10,13 @@ class Sale extends Model
 
     use ActionTakenBy;
 
+    protected $fillable = [
+        'applied_return_amount',
+        'applied_due_amount',
+        'applied_returns',
+        'applied_dues'
+    ];
+
     protected $casts = [
         'applied_returns' => 'array',
         'applied_dues' => 'array',

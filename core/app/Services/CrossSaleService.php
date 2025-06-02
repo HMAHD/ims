@@ -17,18 +17,21 @@ class CrossSaleService
     public function getCustomerAvailableAmounts($customerId)
     {
         $customer = Customer::findOrFail($customerId);
-        
+
+        // Get available returns
         $availableReturns = $customer->saleReturns()
             ->where('due_amount', '>', 0)
             ->with(['sale', 'details.product.unit'])
             ->get()
             ->map(function ($return) {
-                $appliedAmount = $return->appliedToSales()->sum('applied_amount');
+                // Calculate how much has already been applied
+                $appliedAmount = SaleReturnApplication::where('original_sale_return_id', $return->id)
+                    ->sum('applied_amount');
                 $remainingAmount = max(0, $return->due_amount - $appliedAmount);
-                
+
                 return [
                     'id' => $return->id,
-                    'sale_invoice' => $return->sale->invoice_no,
+                    'sale_invoice' => $return->sale->invoice_no ?? 'N/A',
                     'return_date' => $return->return_date,
                     'total_amount' => $return->due_amount,
                     'applied_amount' => $appliedAmount,
@@ -38,15 +41,19 @@ class CrossSaleService
             })
             ->filter(function ($return) {
                 return $return['remaining_amount'] > 0;
-            });
+            })
+            ->values();
 
+        // Get available dues
         $availableDues = $customer->sale()
             ->where('due_amount', '>', 0)
             ->get()
             ->map(function ($sale) {
-                $appliedAmount = $sale->appliedToDues()->sum('applied_amount');
+                // Calculate how much has already been applied
+                $appliedAmount = SaleDueApplication::where('original_sale_id', $sale->id)
+                    ->sum('applied_amount');
                 $remainingAmount = max(0, $sale->due_amount - $appliedAmount);
-                
+
                 return [
                     'id' => $sale->id,
                     'invoice_no' => $sale->invoice_no,
@@ -58,7 +65,8 @@ class CrossSaleService
             })
             ->filter(function ($sale) {
                 return $sale['remaining_amount'] > 0;
-            });
+            })
+            ->values();
 
         return [
             'returns' => $availableReturns,
@@ -74,16 +82,22 @@ class CrossSaleService
     public function applyCrossSaleAmounts($saleId, $appliedReturns = [], $appliedDues = [])
     {
         $sale = Sale::findOrFail($saleId);
-        
+
         DB::transaction(function () use ($sale, $appliedReturns, $appliedDues) {
             $totalReturnAmount = 0;
             $totalDueAmount = 0;
-            
+
             // Apply returns
             foreach ($appliedReturns as $returnData) {
                 $saleReturn = SaleReturn::findOrFail($returnData['return_id']);
-                $appliedAmount = min($returnData['amount'], $saleReturn->getRemainingApplicableAmount());
-                
+
+                // Calculate remaining amount manually
+                $alreadyApplied = SaleReturnApplication::where('original_sale_return_id', $saleReturn->id)
+                    ->sum('applied_amount');
+                $remainingAmount = max(0, $saleReturn->due_amount - $alreadyApplied);
+
+                $appliedAmount = min($returnData['amount'], $remainingAmount);
+
                 if ($appliedAmount > 0) {
                     SaleReturnApplication::create([
                         'new_sale_id' => $sale->id,
@@ -92,16 +106,22 @@ class CrossSaleService
                         'applied_amount' => $appliedAmount,
                         'note' => $returnData['note'] ?? null
                     ]);
-                    
+
                     $totalReturnAmount += $appliedAmount;
                 }
             }
-            
+
             // Apply dues
             foreach ($appliedDues as $dueData) {
                 $originalSale = Sale::findOrFail($dueData['sale_id']);
-                $appliedAmount = min($dueData['amount'], $originalSale->due_amount);
-                
+
+                // Calculate remaining amount manually
+                $alreadyApplied = SaleDueApplication::where('original_sale_id', $originalSale->id)
+                    ->sum('applied_amount');
+                $remainingAmount = max(0, $originalSale->due_amount - $alreadyApplied);
+
+                $appliedAmount = min($dueData['amount'], $remainingAmount);
+
                 if ($appliedAmount > 0) {
                     SaleDueApplication::create([
                         'new_sale_id' => $sale->id,
@@ -110,24 +130,24 @@ class CrossSaleService
                         'applied_amount' => $appliedAmount,
                         'note' => $dueData['note'] ?? null
                     ]);
-                    
+
                     $totalDueAmount += $appliedAmount;
                 }
             }
-            
+
             // Update sale with applied amounts
             $sale->applied_return_amount = $totalReturnAmount;
             $sale->applied_due_amount = $totalDueAmount;
             $sale->applied_returns = $appliedReturns;
             $sale->applied_dues = $appliedDues;
-            
+
             // Recalculate due amount
             $newDueAmount = $sale->receivable_amount + $totalDueAmount - $totalReturnAmount - $sale->received_amount;
             $sale->due_amount = $newDueAmount;
-            
+
             $sale->save();
         });
-        
+
         return $sale->fresh();
     }
 
@@ -137,25 +157,25 @@ class CrossSaleService
     public function removeCrossSaleAmounts($saleId)
     {
         $sale = Sale::findOrFail($saleId);
-        
+
         DB::transaction(function () use ($sale) {
             // Remove return applications
             $sale->returnApplications()->delete();
-            
+
             // Remove due applications
             $sale->dueApplications()->delete();
-            
+
             // Reset sale amounts
             $sale->applied_return_amount = 0;
             $sale->applied_due_amount = 0;
             $sale->applied_returns = null;
             $sale->applied_dues = null;
-            
+
             // Recalculate due amount
             $sale->due_amount = $sale->receivable_amount - $sale->received_amount;
             $sale->save();
         });
-        
+
         return $sale->fresh();
     }
 }

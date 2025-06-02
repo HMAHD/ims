@@ -75,7 +75,6 @@ class Customer extends Model
     {
         return $this->sale()
             ->where('due_amount', '>', 0)
-            ->whereDoesntHave('appliedToDues')
             ->get();
     }
 
