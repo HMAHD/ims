@@ -274,7 +274,7 @@
 
         let productArray = [];
         @if(@$purchase)
-        productArray = @json($purchase - > purchaseDetails - > pluck('product_id') - > toArray());
+        productArray = @json($purchase->purchaseDetails->pluck('product_id')->toArray());
         @endif
 
         calculateGrandTotal();

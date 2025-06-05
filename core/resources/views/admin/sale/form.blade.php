@@ -83,6 +83,11 @@
                                             <div id="available-returns-list">
                                                 <!-- Returns will be loaded here -->
                                             </div>
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-success" id="add-all-returns-btn" style="display: none;">
+                                                    <i class="fas fa-plus"></i> @lang('Add All Return Items to Sale')
+                                                </button>
+                                            </div>
                                         </div>
                                         <div class="col-md-6">
                                             <h6 class="text-warning">@lang('Outstanding Dues')</h6>
@@ -414,23 +419,38 @@
         }
 
         function displayCrossSaleData(data) {
-            // Display available returns
+            // Display available returns with detailed product information
             let returnsHtml = '';
             if (data.returns.length > 0) {
                 returnsHtml += '<div class="table-responsive"><table class="table table-sm">';
-                returnsHtml += '<thead><tr><th>Invoice</th><th>Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>';
+                returnsHtml += '<thead><tr><th>Invoice</th><th>Date</th><th>Amount</th><th>Products</th><th>Action</th></tr></thead><tbody>';
                 data.returns.forEach(function(returnItem) {
+                    let productsList = '';
+                    if (returnItem.details && returnItem.details.length > 0) {
+                        productsList = returnItem.details.map(detail =>
+                            `${detail.product_name} (${detail.quantity} ${detail.unit_name})`
+                        ).join(', ');
+                    }
+
                     returnsHtml += `<tr>
                         <td>${returnItem.sale_invoice}</td>
                         <td>${returnItem.return_date}</td>
                         <td>{{ gs('cur_sym') }}${returnItem.remaining_amount}</td>
-                        <td><button type="button" class="btn btn-sm btn-success apply-return-btn" data-return-id="${returnItem.id}" data-amount="${returnItem.remaining_amount}">Apply</button></td>
+                        <td><small>${productsList}</small></td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-success apply-return-btn" data-return-id="${returnItem.id}" data-amount="${returnItem.remaining_amount}">Apply Amount</button>
+                            <button type="button" class="btn btn-sm btn-info add-return-products-btn" data-return-id="${returnItem.id}">Add Products</button>
+                        </td>
                     </tr>`;
                 });
                 returnsHtml += '</tbody></table></div>';
                 returnsHtml += `<p class="text-success"><strong>Total Available: {{ gs('cur_sym') }}${data.total_return_amount}</strong></p>`;
+
+                // Show the "Add All Returns" button if there are returns
+                $('#add-all-returns-btn').show();
             } else {
                 returnsHtml = '<p class="text-muted">No available returns</p>';
+                $('#add-all-returns-btn').hide();
             }
             $('#available-returns-list').html(returnsHtml);
 
@@ -483,6 +503,101 @@
             appliedDueAmount = parseFloat($(this).val()) || 0;
             calculateGrandTotal();
         });
+
+        // Handle adding individual return products to sale
+        $(document).on('click', '.add-return-products-btn', function() {
+            const returnId = $(this).data('return-id');
+            const returnData = customerCrossSaleData.returns.find(r => r.id == returnId);
+
+            if (returnData && returnData.details) {
+                addReturnProductsToSale(returnData.details, returnData.sale_invoice);
+            }
+        });
+
+        // Handle adding all return products to sale
+        $(document).on('click', '#add-all-returns-btn', function() {
+            if (customerCrossSaleData.returns) {
+                customerCrossSaleData.returns.forEach(function(returnData) {
+                    if (returnData.details) {
+                        addReturnProductsToSale(returnData.details, returnData.sale_invoice);
+                    }
+                });
+            }
+        });
+
+        // Function to add return products as negative line items
+        function addReturnProductsToSale(returnDetails, invoiceNo) {
+            returnDetails.forEach(function(detail) {
+                let index = $('.product-row').length + 1;
+                let productId = detail.product_id;
+
+                // Check if this return product is already added
+                let existingReturnRow = $(`.product-row[data-return-product="true"][data-product_id="${productId}"]`);
+
+                if (existingReturnRow.length > 0) {
+                    // Update existing return row quantity
+                    let quantityField = existingReturnRow.find('.quantity');
+                    let currentQty = parseFloat(quantityField.val()) || 0;
+                    let newQty = currentQty - detail.quantity; // Negative quantity for returns
+                    quantityField.val(newQty.toFixed(3));
+                    calculateProductData(productId);
+                } else {
+                    // Add new return row with negative quantity
+                    $(".productTable tbody").append(`
+                        <tr data-product_id="${productId}" data-return-product="true" class="product-row product-row-${productId} table-warning">
+                            <td data-label="@lang('Name')" class="fw-bold">
+                                <input type="text" class="form-control" value="${detail.product_name} (Return from ${invoiceNo})" readonly required>
+                                <input type="hidden" class="product_id" name="products[${index}][product_id]" value="${productId}"/>
+                                <input type="hidden" name="products[${index}][is_return]" value="1"/>
+                                <input type="hidden" name="products[${index}][return_invoice]" value="${invoiceNo}"/>
+                            </td>
+
+                            <td data-label="@lang('In Stock')">
+                                <div class="input-group">
+                                    <input type="number" name="products[${index}][stock_quantity]" value="0" class="form-control stock_quantity" data-id="${productId}" readonly required>
+                                    <span class="input-group-text">${detail.unit_name}</span>
+                                </div>
+                            </td>
+
+                            <td data-label="@lang('Quantity')">
+                                <div class="input-group">
+                                    <input type="number" step="0.001" name="products[${index}][quantity]" value="-${detail.quantity}" class="form-control quantity" data-id="${productId}" required readonly>
+                                    <span class="input-group-text">${detail.unit_name}</span>
+                                </div>
+                                <span class="error-message text--danger"></span>
+                            </td>
+
+                            <td data-label="@lang('Price')">
+                                <div class="input-group">
+                                    <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                                    <input type="number" name="products[${index}][price]" class="form-control sales_price" data-id="${productId}" value="${detail.price}" readonly required>
+                                </div>
+                            </td>
+
+                            <td data-label="@lang('Total')">
+                                <div class="input-group">
+                                    <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                                    <input type="number" value="${(-detail.quantity * detail.price).toFixed(2)}" class="form-control total" readonly>
+                                </div>
+                            </td>
+
+                            <td data-label="@lang('Action')">
+                                <button type="button" class="btn btn-outline--danger removeBtn h-45">
+                                    <i class="la la-trash"></i> @lang('Remove')
+                                </button>
+                            </td>
+                        </tr>
+                    `);
+
+                    // Add to product array if not already there
+                    if (!productArray.includes(productId)) {
+                        productArray.push(productId);
+                    }
+                }
+            });
+
+            calculateGrandTotal();
+        }
 
         $("[name='search']").on('input', function() {
             console.log('Search input event fired!', $(this).val());

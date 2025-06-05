@@ -338,6 +338,12 @@ class SaleController extends Controller
             $saleDetail->quantity   = $product->quantity;
             $saleDetail->price      = $product->price;
             $saleDetail->total      = $product->quantity * $product->price;
+
+            // Handle return information
+            $saleDetail->is_return = isset($product->is_return) ? (bool)$product->is_return : false;
+            $saleDetail->return_invoice = $product->return_invoice ?? null;
+            $saleDetail->return_note = $product->return_note ?? null;
+
             $saleDetail->save();
         }
     }
@@ -402,8 +408,10 @@ class SaleController extends Controller
             'sale_date'             => 'required|date_format:Y-m-d',
             'products'              => 'required|array|min:1',
             'products.*.product_id' => 'required|integer|gt:0',
-            'products.*.quantity'   => 'required|numeric|gt:0',
+            'products.*.quantity'   => 'required|numeric', // Allow negative for returns
             'products.*.price'      => 'required|numeric|gte:0',
+            'products.*.is_return'  => 'nullable|boolean',
+            'products.*.return_invoice' => 'nullable|string',
             'discount'              => 'nullable|numeric|gte:0',
             'note'                  => 'nullable|string',
         ]);

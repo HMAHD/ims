@@ -18,7 +18,7 @@ class CrossSaleService
     {
         $customer = Customer::findOrFail($customerId);
 
-        // Get available returns
+        // Get available returns with detailed product information
         $availableReturns = $customer->saleReturns()
             ->where('due_amount', '>', 0)
             ->with(['sale', 'details.product.unit'])
@@ -29,6 +29,19 @@ class CrossSaleService
                     ->sum('applied_amount');
                 $remainingAmount = max(0, $return->due_amount - $appliedAmount);
 
+                // Format return details for easy use in new sale
+                $returnDetails = $return->details->map(function ($detail) {
+                    return [
+                        'product_id' => $detail->product_id,
+                        'product_name' => $detail->product->name,
+                        'product_sku' => $detail->product->sku,
+                        'unit_name' => $detail->product->unit->name ?? '',
+                        'quantity' => $detail->quantity,
+                        'price' => $detail->price,
+                        'total' => $detail->quantity * $detail->price
+                    ];
+                });
+
                 return [
                     'id' => $return->id,
                     'sale_invoice' => $return->sale->invoice_no ?? 'N/A',
@@ -36,7 +49,8 @@ class CrossSaleService
                     'total_amount' => $return->due_amount,
                     'applied_amount' => $appliedAmount,
                     'remaining_amount' => $remainingAmount,
-                    'details' => $return->details
+                    'details' => $returnDetails,
+                    'can_add_to_sale' => true // Flag to indicate these can be added as line items
                 ];
             })
             ->filter(function ($return) {
