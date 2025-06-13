@@ -15,6 +15,8 @@ use Illuminate\Http\Request;
 class AdjustmentController extends Controller
 {
     protected $pageTitle;
+    protected $products;
+    protected $productStock;
 
     public function __construct()
     {
@@ -280,14 +282,51 @@ class AdjustmentController extends Controller
         ]);
     }
 
-    public function searchProduct()
+    public function searchProduct(Request $request)
     {
-        $products = Product::searchable(['name', 'sku'])->with('productStock', 'unit')->get();
+        try {
+            $warehouse = $request->warehouse;
+            $search = $request->search;
+            $allProducts = $request->boolean('all_products', false);
 
-        if ($products) {
+            if (!$warehouse) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Warehouse is required',
+                    'data' => []
+                ]);
+            }
+
+            $query = Product::query();
+
+            // If requesting all products or search is empty, get all products
+            if ($allProducts || empty($search)) {
+                // Get all products with stock information for the warehouse
+                $products = $query->with(['productStock' => function ($q) use ($warehouse) {
+                    $q->where('warehouse_id', $warehouse);
+                }, 'unit'])->get();
+            } else {
+                // Search specific products with stock
+                $products = $query
+                    ->where(function ($query) use ($search) {
+                        $query->where('name', 'like', '%' . $search . '%')
+                            ->orWhere('sku', 'like', '%' . $search . '%');
+                    })
+                    ->with(['productStock' => function ($q) use ($warehouse) {
+                        $q->where('warehouse_id', $warehouse);
+                    }, 'unit'])
+                    ->get();
+            }
+
             return response()->json([
                 'success' => true,
-                'data'    => $products,
+                'data' => $products,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error searching products: ' . $e->getMessage(),
+                'data' => []
             ]);
         }
     }

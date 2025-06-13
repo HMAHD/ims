@@ -210,7 +210,7 @@
 
         let productArray = [];
         @if(@$transfer)
-        productArray = @json($transfer - > transferDetails - > pluck('product_id') - > toArray());
+        productArray = @json($transfer->transferDetails->pluck('product_id')->toArray());
         @endif
 
         $("[name='search']").on('input', function() {

@@ -1198,9 +1198,12 @@
 
             // Keep cross-sale data visible when warehouse changes
             const customerId = $('#customer').val();
-            if (customerId && customerCrossSaleData[customerId]) {
-                // Refresh cross-sale display to ensure it stays visible
-                displayCustomerCrossSaleData(customerCrossSaleData[customerId]);
+            if (customerId && customerCrossSaleData) {
+                console.log('Refreshing cross-sale data after warehouse change');
+                // Force refresh the cross-sale display
+                displayCrossSaleData(customerCrossSaleData);
+                // Ensure the section stays visible
+                $('#customer-cross-sale-section').show();
             }
         })
 

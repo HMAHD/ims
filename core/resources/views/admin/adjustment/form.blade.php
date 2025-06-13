@@ -37,11 +37,32 @@
                         </div>
                         <div class="col-sm-12">
                             <div class="form-group products-container position-relative">
-                                <label> @lang('Product')</label>
-                                <div class="input-group">
+                                <label class="form-label d-flex align-items-center justify-content-between">
+                                    <span>@lang('Product')</span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="toggle-product-list">
+                                        <i class="fas fa-list"></i> @lang('Browse All')
+                                    </button>
+                                </label>
+
+                                <!-- Search Input -->
+                                <div class="input-group mb-2">
                                     <span class="input-group-text"><i class="las la-search"></i></span>
                                     <input class="form-control keyword" name="search" type="search" placeholder="@lang('Product Name or SKU')">
                                 </div>
+
+                                <!-- Scrollable Product List -->
+                                <div id="product-scroll-list" class="product-scroll-container" style="display: none;">
+                                    <div class="product-scroll-header">
+                                        <h6 class="mb-0">@lang('Select Product')</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="close-product-list">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="product-scroll-list-content">
+                                        <!-- Products will be loaded here -->
+                                    </div>
+                                </div>
+
                                 <ul class="products">
                                     <!-- Product data will append here after search -->
                                 </ul>
@@ -189,6 +210,87 @@
     .empty-notification img {
         width: 30px;
         padding-top: 12px;
+    }
+
+    /* Product scroll list styles */
+    .product-scroll-container {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        max-height: 400px;
+        overflow: hidden;
+    }
+
+    .product-scroll-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .product-scroll-list-content {
+        max-height: 350px;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .product-scroll-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        margin-bottom: 8px;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .product-scroll-item:hover {
+        border-color: #007bff;
+        background: #f8f9ff;
+        transform: translateY(-1px);
+    }
+
+    .product-scroll-item.out-of-stock {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background: #f8f8f8;
+    }
+
+    .product-scroll-item.out-of-stock:hover {
+        border-color: #dc3545;
+        background: #fff5f5;
+        transform: none;
+    }
+
+    .product-info {
+        flex: 1;
+    }
+
+    .product-stock {
+        margin-left: 12px;
+    }
+
+    @media (max-width: 768px) {
+        .product-scroll-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 500px;
+            max-height: 70vh;
+        }
     }
 </style>
 @endpush
@@ -414,6 +516,154 @@
                 $("tbody").empty();
             }
         })
+
+        // Product scroll list functionality
+        $('#toggle-product-list').on('click', function() {
+            const warehouseId = $("[name=warehouse_id]").find(':selected').val();
+            if (!warehouseId) {
+                $('#warningModal').modal('show');
+                return;
+            }
+
+            $('#product-scroll-list').toggle();
+            if ($('#product-scroll-list').is(':visible')) {
+                loadAllProducts(warehouseId);
+                $(this).html('<i class="fas fa-search"></i> @lang("Search Mode")');
+            } else {
+                $(this).html('<i class="fas fa-list"></i> @lang("Browse All")');
+            }
+        });
+
+        $('#close-product-list').on('click', function() {
+            $('#product-scroll-list').hide();
+            $('#toggle-product-list').html('<i class="fas fa-list"></i> @lang("Browse All")');
+        });
+
+        // Load all products for scroll list
+        function loadAllProducts(warehouseId) {
+            $.ajax({
+                url: "{{ route('admin.adjustment.search.product') }}",
+                type: "GET",
+                data: {
+                    warehouse: warehouseId,
+                    search: '', // Empty search to get all products
+                    all_products: true
+                },
+                success: function(response) {
+                    displayProductScrollList(response.data);
+                },
+                error: function() {
+                    $('.product-scroll-list-content').html('<p class="text-center text-muted p-3">@lang("Error loading products")</p>');
+                }
+            });
+        }
+
+        // Display products in scroll list
+        function displayProductScrollList(products) {
+            let html = '';
+            const warehouseId = $("[name=warehouse_id]").find(':selected').val();
+
+            if (products && products.length > 0) {
+                products.forEach(function(product) {
+                    if (product && product.product_stock) {
+                        const stock = product.product_stock.find(s => s.warehouse_id == warehouseId);
+                        const stockQuantity = stock ? stock.quantity : 0;
+                        const unitName = product.unit ? product.unit.name : '';
+                        const isOutOfStock = stockQuantity <= 0;
+
+                        html += `
+                            <div class="product-scroll-item ${isOutOfStock ? 'out-of-stock' : ''}"
+                                 data-product-id="${product.id}"
+                                 data-product-name="${product.name}"
+                                 data-stock="${stockQuantity}"
+                                 data-unit="${unitName}">
+                                <div class="product-info">
+                                    <div class="fw-bold">${product.name}</div>
+                                    <small class="text-muted">SKU: ${product.sku}</small>
+                                </div>
+                                <div class="product-stock">
+                                    <span class="badge ${isOutOfStock ? 'bg-danger' : 'bg-success'}">
+                                        ${stockQuantity} ${unitName}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                html = '<p class="text-center text-muted p-3">@lang("No products found")</p>';
+            }
+            $('.product-scroll-list-content').html(html);
+        }
+
+        // Handle product selection from scroll list
+        $(document).on('click', '.product-scroll-item:not(.out-of-stock)', function() {
+            const productId = $(this).data('product-id');
+            const productName = $(this).data('product-name');
+            const stock = $(this).data('stock');
+            const unit = $(this).data('unit');
+
+            // Add product to adjustment using existing functionality
+            if (productArray.includes(productId)) {
+                notify('error', 'Product already added');
+                return;
+            }
+
+            // Simulate click on productItem to use existing logic
+            const fakeProductItem = $('<div>').data({
+                id: productId,
+                name: productName,
+                stock: stock,
+                unit: unit
+            });
+
+            // Trigger existing product selection logic
+            let index = $('.product-row ').length + 1;
+            productArray.push(productId);
+
+            $(".productTable tbody").append(`
+                <tr data-product_id="${productId}" class="product-row">
+                    <td data-label="@lang('Name')">
+                        ${productName}
+                        <input type="hidden" name="products[${index}][product_id]" value="${productId}"/>
+                    </td>
+                    <td data-label="@lang('Current Stock')">
+                        <span class="stock-qty">${stock}</span> ${unit}
+                    </td>
+                    <td data-label="@lang('Stock - After Adjust')">
+                        <span class="after-adjust-qty"></span>
+                        ${unit}
+                        <br/>
+                        <span class="text--danger error-message"></span>
+                    </td>
+                    <td data-label="@lang('Adjust Qty')">
+                        <input type="hidden" class="old-qty" value="0">
+                        <input type="hidden" class="old-type" value="1">
+                        <div class="input-group">
+                            <input type="number" step="0.001" min="0.001" name="products[${index}][quantity]" value="1" class="bg--white form-control quantity" data-id="${productId}" required>
+                            <span class="input-group-text">${unit}</span>
+                        </div>
+                    </td>
+                    <td data-label="@lang('Type')">
+                        <select name="products[${index}][adjust_type]" class="form-control adjust-type" required>
+                            <option value="1">@lang('Subtract')(-)</option>
+                            <option value="2">@lang('Add')(+)</option>
+                        </select>
+                    </td>
+                    <td data-label="@lang('Action')">
+                        <button type="button" class="btn btn-outline--danger removeBtn h-45 max-content">
+                            <i class="la la-trash"></i> @lang('Remove')
+                        </button>
+                    </td>
+                </tr>
+            `);
+
+            setAdjustQuantity($(".productTable tr:last-child").find('.quantity'));
+
+            // Close scroll list
+            $('#product-scroll-list').hide();
+            $('#toggle-product-list').html('<i class="fas fa-list"></i> @lang("Browse All")');
+        });
 
     })(jQuery);
 </script>
