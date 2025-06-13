@@ -26,7 +26,14 @@
     @endif
 </div>
 
-<!-- Items Table -->
+<!-- New Products Section -->
+@php
+$newProducts = $sale->saleDetails->where('is_return', false);
+$returnProducts = $sale->saleDetails->where('is_return', true);
+@endphp
+
+@if($newProducts->count() > 0)
+<div class="section-title">@lang('NEW PRODUCTS')</div>
 <table class="table">
     <thead>
         <tr>
@@ -37,7 +44,7 @@
         </tr>
     </thead>
     <tbody>
-        @forelse($sale->saleDetails as $item)
+        @foreach($newProducts as $item)
         <tr>
             <td class="item">
                 <div class="strong">{{ $item->product->name }}</div>
@@ -49,13 +56,62 @@
             <td class="price">{{ showAmount($item->price) }}</td>
             <td class="total">{{ showAmount($item->total) }}</td>
         </tr>
-        @empty
+        @endforeach
+    </tbody>
+</table>
+@endif
+
+<!-- Return Products Section -->
+@if($returnProducts->count() > 0)
+<div class="section-title">@lang('RETURNED PRODUCTS')</div>
+<table class="table return-table">
+    <thead>
+        <tr>
+            <th class="item">@lang('Item')</th>
+            <th class="qty">@lang('Qty')</th>
+            <th class="price">@lang('Price')</th>
+            <th class="total">@lang('Total')</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach($returnProducts as $item)
+        <tr>
+            <td class="item">
+                <div class="strong">{{ $item->product->name }}</div>
+                @if($item->product->sku)
+                <div class="text-xs">{{ $item->product->sku }}</div>
+                @endif
+                @if($item->return_invoice)
+                <div class="text-xs">@lang('From'): {{ $item->return_invoice }}</div>
+                @endif
+            </td>
+            <td class="qty">{{ $item->quantity }}{{ $item->product->unit ? ' ' . $item->product->unit->name : '' }}</td>
+            <td class="price">{{ showAmount($item->price) }}</td>
+            <td class="total">{{ showAmount($item->total) }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+@endif
+
+<!-- All Products (fallback if no separation needed) -->
+@if($newProducts->count() == 0 && $returnProducts->count() == 0)
+<table class="table">
+    <thead>
+        <tr>
+            <th class="item">@lang('Item')</th>
+            <th class="qty">@lang('Qty')</th>
+            <th class="price">@lang('Price')</th>
+            <th class="total">@lang('Total')</th>
+        </tr>
+    </thead>
+    <tbody>
         <tr>
             <td colspan="4" class="center">@lang('No items found')</td>
         </tr>
-        @endforelse
     </tbody>
 </table>
+@endif
 
 <!-- Summary -->
 <div class="summary">

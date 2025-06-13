@@ -71,44 +71,53 @@
                         </div>
 
                         <!-- Customer Cross-Sale Information -->
-                        <div class="col-sm-12" id="customer-cross-sale-section" style="display: none;">
+                        <div class="col-12" id="customer-cross-sale-section" style="display: none;">
                             <div class="card border-primary mb-3">
                                 <div class="card-header bg-primary text-white">
                                     <h6 class="mb-0">@lang('Customer Previous Returns & Due Amounts')</h6>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Mobile-first responsive layout -->
                                     <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="text-success">@lang('Available Returns')</h6>
-                                            <div id="available-returns-list">
+                                        <div class="col-12 col-lg-6 mb-3">
+                                            <h6 class="text-success d-flex align-items-center">
+                                                <i class="fas fa-undo me-2"></i>
+                                                @lang('Available Returns')
+                                            </h6>
+                                            <div id="available-returns-list" class="mobile-scroll-container">
                                                 <!-- Returns will be loaded here -->
                                             </div>
-                                            <div class="mt-2">
-                                                <button type="button" class="btn btn-sm btn-success" id="add-all-returns-btn" style="display: none;">
+                                            <div class="mt-2 d-grid">
+                                                <button type="button" class="btn btn-success btn-sm" id="add-all-returns-btn" style="display: none;">
                                                     <i class="fas fa-plus"></i> @lang('Add All Return Items to Sale')
                                                 </button>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
-                                            <h6 class="text-warning">@lang('Outstanding Dues')</h6>
-                                            <div id="available-dues-list">
+                                        <div class="col-12 col-lg-6 mb-3">
+                                            <h6 class="text-warning d-flex align-items-center">
+                                                <i class="fas fa-clock me-2"></i>
+                                                @lang('Outstanding Dues')
+                                            </h6>
+                                            <div id="available-dues-list" class="mobile-scroll-container">
                                                 <!-- Dues will be loaded here -->
                                             </div>
                                         </div>
                                     </div>
+
+                                    <!-- Amount application section -->
                                     <div class="row mt-3">
-                                        <div class="col-md-6">
+                                        <div class="col-12 col-md-6 mb-3">
                                             <div class="form-group">
-                                                <label>@lang('Apply Return Amount')</label>
+                                                <label class="form-label">@lang('Apply Return Amount')</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">{{ gs('cur_sym') }}</span>
                                                     <input type="number" class="form-control" id="apply-return-amount" step="0.01" min="0" value="0">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-12 col-md-6 mb-3">
                                             <div class="form-group">
-                                                <label>@lang('Apply Due Amount')</label>
+                                                <label class="form-label">@lang('Apply Due Amount')</label>
                                                 <div class="input-group">
                                                     <span class="input-group-text">{{ gs('cur_sym') }}</span>
                                                     <input type="number" class="form-control" id="apply-due-amount" step="0.01" min="0" value="0">
@@ -120,13 +129,34 @@
                             </div>
                         </div>
 
-                        <div class="col-sm-12">
+                        <div class="col-12">
                             <div class="form-group products-container position-relative">
-                                <label> @lang('Product')<span class="text--danger">*</span></label>
-                                <div class="input-group">
+                                <label class="form-label d-flex align-items-center justify-content-between">
+                                    <span>@lang('Product')<span class="text--danger">*</span></span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="toggle-product-list">
+                                        <i class="fas fa-list"></i> @lang('Browse All')
+                                    </button>
+                                </label>
+
+                                <!-- Search Input -->
+                                <div class="input-group mb-2">
                                     <span class="input-group-text"><i class="las la-search"></i></span>
                                     <input class="form-control keyword" name="search" type="search" placeholder="@lang('Product Name or SKU')">
                                 </div>
+
+                                <!-- Product Scroll List (Hidden by default) -->
+                                <div id="product-scroll-list" class="product-scroll-container" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small class="text-muted">@lang('All Products in Selected Warehouse')</small>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" id="close-product-list">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="product-scroll-list-content">
+                                        <!-- Products will be loaded here -->
+                                    </div>
+                                </div>
+
                                 <ul class="products">
                                 </ul>
                                 <span class="text--danger error-message"></span>
@@ -330,6 +360,146 @@
         width: 30px;
         padding-top: 12px;
     }
+
+    .products {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+    }
+
+    .products li {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+    }
+
+    .products li:hover {
+        background-color: #f8f9fa;
+    }
+
+    .products li:last-child {
+        border-bottom: none;
+    }
+
+    .products.show {
+        display: block;
+    }
+
+    /* Mobile responsive styles */
+    .mobile-scroll-container {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+    }
+
+    .product-scroll-container {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        background-color: #f8f9fa;
+        margin-bottom: 1rem;
+    }
+
+    .product-scroll-list-content {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        background-color: white;
+    }
+
+    .product-scroll-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #dee2e6;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .product-scroll-item:hover {
+        background-color: #e9ecef;
+    }
+
+    .product-scroll-item:last-child {
+        border-bottom: none;
+    }
+
+    .product-scroll-item.out-of-stock {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .product-scroll-item.out-of-stock:hover {
+        background-color: transparent;
+    }
+
+    .product-info {
+        flex: 1;
+    }
+
+    .product-stock {
+        font-size: 0.875rem;
+        color: #6c757d;
+    }
+
+    /* Mobile specific adjustments */
+    @media (max-width: 768px) {
+        .mobile-scroll-container {
+            max-height: 200px;
+        }
+
+        .product-scroll-list-content {
+            max-height: 300px;
+        }
+
+        .btn-sm {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .table-responsive {
+            font-size: 0.9rem;
+        }
+
+        .input-group-text {
+            padding: 0.375rem 0.5rem;
+        }
+
+        .product-scroll-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+        }
+    }
+
+    /* Cross-sale mobile improvements */
+    @media (max-width: 576px) {
+        .d-flex.align-items-center.justify-content-between {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 0.5rem;
+        }
+
+        .btn-outline-primary {
+            align-self: flex-end;
+        }
+
+        .card-body {
+            padding: 1rem 0.75rem;
+        }
+    }
 </style>
 @endpush
 
@@ -383,6 +553,148 @@
         console.log('jQuery loaded:', typeof $ !== 'undefined');
         console.log('Search input found:', $("[name='search']").length);
         console.log('Warehouse select found:', $("[name=warehouse_id]").length);
+
+        // Product scroll list functionality
+        $('#toggle-product-list').on('click', function() {
+            const warehouseId = $("[name=warehouse_id]").find(':selected').val();
+            if (!warehouseId) {
+                $('#warningModal').modal('show');
+                return;
+            }
+
+            $('#product-scroll-list').toggle();
+            if ($('#product-scroll-list').is(':visible')) {
+                loadAllProducts(warehouseId);
+                $(this).html('<i class="fas fa-search"></i> @lang("Search Mode")');
+            } else {
+                $(this).html('<i class="fas fa-list"></i> @lang("Browse All")');
+            }
+        });
+
+        $('#close-product-list').on('click', function() {
+            $('#product-scroll-list').hide();
+            $('#toggle-product-list').html('<i class="fas fa-list"></i> @lang("Browse All")');
+        });
+
+        // Load all products for scroll list
+        function loadAllProducts(warehouseId) {
+            $.ajax({
+                url: "{{ route('admin.sale.search.product') }}",
+                type: "GET",
+                data: {
+                    warehouse: warehouseId,
+                    search: '', // Empty search to get all products
+                    all_products: true
+                },
+                success: function(response) {
+                    displayProductScrollList(response.data);
+                },
+                error: function() {
+                    $('.product-scroll-list-content').html('<p class="text-center text-muted p-3">@lang("Error loading products")</p>');
+                }
+            });
+        }
+
+        // Display products in scroll list
+        function displayProductScrollList(products) {
+            let html = '';
+            if (products && products.length > 0) {
+                products.forEach(function(product) {
+                    const warehouseId = $("[name=warehouse_id]").find(':selected').val();
+                    const stock = product.product_stock ? product.product_stock.find(s => s.warehouse_id == warehouseId) : null;
+                    const stockQuantity = stock ? stock.quantity : 0;
+                    const unitName = product.unit ? product.unit.name : '';
+                    const isOutOfStock = stockQuantity <= 0;
+
+                    html += `
+                        <div class="product-scroll-item ${isOutOfStock ? 'out-of-stock' : ''}"
+                             data-product-id="${product.id}"
+                             data-product-name="${product.name}"
+                             data-stock="${stockQuantity}"
+                             data-unit="${unitName}">
+                            <div class="product-info">
+                                <div class="fw-bold">${product.name}</div>
+                                <small class="text-muted">SKU: ${product.sku}</small>
+                            </div>
+                            <div class="product-stock">
+                                <span class="badge ${isOutOfStock ? 'bg-danger' : 'bg-success'}">
+                                    ${stockQuantity} ${unitName}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                html = '<p class="text-center text-muted p-3">@lang("No products found")</p>';
+            }
+            $('.product-scroll-list-content').html(html);
+        }
+
+        // Handle product selection from scroll list
+        $(document).on('click', '.product-scroll-item:not(.out-of-stock)', function() {
+            const productId = $(this).data('product-id');
+            const productName = $(this).data('product-name');
+            const stock = $(this).data('stock');
+            const unit = $(this).data('unit');
+
+            // Add product to sale using existing functionality
+            if (productArray.includes(productId)) {
+                notify('error', 'Product already added');
+                return;
+            }
+
+            // Add to product array and create table row
+            productArray.push(productId);
+            addProductRow(productId, productName, stock, unit);
+
+            // Close scroll list
+            $('#product-scroll-list').hide();
+            $('#toggle-product-list').html('<i class="fas fa-list"></i> @lang("Browse All")');
+        });
+
+        // Function to add product row to table
+        function addProductRow(productId, productName, stock, unit) {
+            const tbody = $('.productTable tbody');
+            const rowCount = tbody.find('tr').length + 1;
+
+            const row = `
+                <tr>
+                    <td>
+                        <input type="hidden" name="products[${rowCount}][product_id]" value="${productId}">
+                        <span class="fw-bold">${productName}</span>
+                    </td>
+                    <td>
+                        <div class="input-group">
+                            <input type="number" class="form-control quantity" name="products[${rowCount}][quantity]"
+                                   value="1" min="0.001" step="0.001" required>
+                            <span class="input-group-text">${unit}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                            <input type="number" class="form-control price" name="products[${rowCount}][price]"
+                                   value="0" min="0" step="0.01" required>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="input-group">
+                            <span class="input-group-text">{{ gs('cur_sym') }}</span>
+                            <input type="number" class="form-control total" name="products[${rowCount}][total]"
+                                   value="0" readonly>
+                        </div>
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-product">
+                            <i class="las la-times"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+
+            tbody.append(row);
+            calculateGrandTotal();
+        }
 
         // Load customer cross-sale data when customer is selected
         $('#customer').on('change', function() {
@@ -882,6 +1194,13 @@
             if (productArray) {
                 productArray = [];
                 $("tbody").empty();
+            }
+
+            // Keep cross-sale data visible when warehouse changes
+            const customerId = $('#customer').val();
+            if (customerId && customerCrossSaleData[customerId]) {
+                // Refresh cross-sale display to ensure it stays visible
+                displayCustomerCrossSaleData(customerCrossSaleData[customerId]);
             }
         })
 

@@ -422,57 +422,40 @@ class SaleController extends Controller
         try {
             $warehouse = $request->warehouse;
             $search = $request->search;
+            $allProducts = $request->boolean('all_products', false);
 
-            // Debug: Check if we have any products at all
-            $totalProducts = Product::count();
-            $totalWarehouses = Warehouse::count();
-            $totalStocks = ProductStock::count();
-
-            if (!$warehouse || !$search) {
+            if (!$warehouse) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Warehouse and search term are required',
-                    'debug' => [
-                        'total_products' => $totalProducts,
-                        'total_warehouses' => $totalWarehouses,
-                        'total_stocks' => $totalStocks,
-                        'warehouse_received' => $warehouse,
-                        'search_received' => $search
-                    ],
+                    'message' => 'Warehouse is required',
                     'data' => []
                 ]);
             }
 
-            // First, let's try without stock filter to see if products exist
-            $allProducts = Product::where(function ($query) use ($search) {
-                $query->where('name', 'like', '%' . $search . '%')
-                    ->orWhere('sku', 'like', '%' . $search . '%');
-            })->with(['productStock', 'unit'])->get();
+            $query = Product::query();
 
-            // Now with stock filter
-            $products = Product::query()
-                ->whereHas('productStock', function ($q) use ($warehouse) {
-                    $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
-                })
-                ->where(function ($query) use ($search) {
-                    $query->where('name', 'like', '%' . $search . '%')
-                        ->orWhere('sku', 'like', '%' . $search . '%');
-                })
-                ->with(['productStock', 'unit'])
-                ->get();
+            // If requesting all products or search is empty, get all products
+            if ($allProducts || empty($search)) {
+                // Get all products with stock information for the warehouse
+                $products = $query->with(['productStock' => function ($q) use ($warehouse) {
+                    $q->where('warehouse_id', $warehouse);
+                }, 'unit'])->get();
+            } else {
+                // Search specific products with stock
+                $products = $query
+                    ->whereHas('productStock', function ($q) use ($warehouse) {
+                        $q->where('warehouse_id', $warehouse)->where('quantity', '>', 0);
+                    })
+                    ->where(function ($query) use ($search) {
+                        $query->where('name', 'like', '%' . $search . '%')
+                            ->orWhere('sku', 'like', '%' . $search . '%');
+                    })
+                    ->with(['productStock', 'unit'])
+                    ->get();
+            }
 
             return response()->json([
                 'success' => true,
-                'debug' => [
-                    'total_products' => $totalProducts,
-                    'total_warehouses' => $totalWarehouses,
-                    'total_stocks' => $totalStocks,
-                    'warehouse_id' => $warehouse,
-                    'search_term' => $search,
-                    'all_matching_products' => $allProducts->count(),
-                    'products_with_stock' => $products->count(),
-                    'warehouse_stocks' => ProductStock::where('warehouse_id', $warehouse)->count()
-                ],
                 'data' => $products,
             ]);
         } catch (\Exception $e) {

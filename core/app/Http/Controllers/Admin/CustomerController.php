@@ -81,7 +81,7 @@ class CustomerController extends Controller
         }
 
         $customer->name    = $request->name;
-        $customer->email   = strtolower(trim($request->email));
+        $customer->email   = $request->email ? strtolower(trim($request->email)) : null;
         $customer->mobile  = $request->mobile;
         $customer->address = $request->address;
         $customer->save();
